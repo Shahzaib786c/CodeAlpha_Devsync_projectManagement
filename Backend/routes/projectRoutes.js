@@ -1,0 +1,14 @@
+import { Router } from 'express';
+import * as c from '../controllers/projectController.js';
+import { validate as v, validateIds } from '../middleware/validate.js';
+import * as s from '../validators/schemas.js';
+import taskRoutes from './taskRoutes.js';
+const router = Router();
+router.route('/').get(c.getProjects).post(v(s.project), c.createProject);
+router.use('/:projectId', validateIds);
+router.route('/:projectId').get(c.getProject).patch(v(s.patch(s.project)), c.updateProject).delete(c.deleteProject);
+router.get('/:projectId/board', c.board);
+router.post('/:projectId/members', v(s.member), c.addMember);
+router.delete('/:projectId/members/:userId', validateIds, c.removeMember);
+router.use('/:projectId/tasks', taskRoutes);
+export default router;

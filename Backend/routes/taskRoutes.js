@@ -1,0 +1,12 @@
+import { Router } from 'express';
+import * as c from '../controllers/taskController.js';
+import { validate as v, validateIds } from '../middleware/validate.js';
+import * as s from '../validators/schemas.js';
+import commentRoutes from './commentRoutes.js';
+const router = Router({ mergeParams: true });
+router.route('/').get(c.getTasks).post(v(s.task), c.createTask);
+router.use('/:taskId', validateIds);
+router.route('/:taskId').get(c.getTask).patch(v(s.patch(s.task)), c.updateTask).delete(c.deleteTask);
+router.patch('/:taskId/status', v(s.taskStatus), c.updateTask);
+router.use('/:taskId/comments', commentRoutes);
+export default router;

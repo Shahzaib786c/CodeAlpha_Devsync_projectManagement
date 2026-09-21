@@ -1,0 +1,33 @@
+import express from 'express';
+import { mediaService } from './services/mediaService.js';
+import cors from 'cors';
+import helmet from 'helmet';
+import { rateLimit } from 'express-rate-limit';
+import { createServer } from 'node:http';
+import mongoose from 'mongoose';
+import authRoutes from './routes/authRoutes.js';
+import projectRoutes from './routes/projectRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
+import verifyToken from './middleware/verifyToken.js';
+import errorHandler from './middleware/errorHandler.js';
+import { overview, myTasks } from './controllers/taskController.js';
+import { createLocks } from './services/locks.js';
+import { setupSockets } from './sockets/socketServer.js';
+export function createApplication({ store, secret, origin = 'http://localhost:5173', media = mediaService }) {
+  const app = express();
+  const context = { store, secret, media, lock: createLocks() };
+  app.locals.context = context;
+  app.disable('x-powered-by'); app.use(helmet()); app.use(cors({ origin }));
+  app.use(express.json({ limit: '32kb' }));
+  app.use(rateLimit({ windowMs: 60000, limit: 600, standardHeaders: 'draft-8', legacyHeaders: false, message: { success: false, message: 'Too many requests' } }));
+  app.get('/api/health', (req,res) => { const ready = store.mode === 'memory-demo' || mongoose.connection.readyState === 1; res.status(ready ? 200 : 503).json({ success: ready, storage: store.mode }); });
+  app.use('/api/auth', authRoutes);
+  app.use('/api', verifyToken);
+  app.get('/api/overview', overview); app.get('/api/tasks/mine', myTasks);
+  app.use('/api/projects', projectRoutes); app.use('/api/notifications', notificationRoutes);
+  app.use((req,res) => res.status(404).json({ success: false, message: 'Route not found' }));
+  app.use(errorHandler);
+  const server = createServer(app);
+  const io = setupSockets(server, context, origin); context.io = io;
+  return { app, server, io, context };
+}
